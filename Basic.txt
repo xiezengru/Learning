@@ -1,0 +1,76 @@
+AI
+token 代表单词或者单词片段的数字 提升效率
+字词 数字 转换 tokenizer
+tiktoken BPE
+WordPiece 
+Vocab Size 
+gpt-4o gpt-4o-mini 对中文支持更好
+
+是预处理
+不是模型的一部分
+
+大语言模型 超级复杂的连续函数
+token是输入
+input embedding output embedding
+
+多维向量
+
+把token转成一串数字就是embedding
+
+d_model
+e_embd
+
+Tokenizer 把用户文字转成数字
+Embedding 把token转换成向量
+
+embedding是大语言模型的一部分 是训练出来的
+
+RAG Embedding 概括一段话
+LLM Embedding 打散一个词
+
+大模型的最后是把模型输出的Embedding通过linear转换成人类可以理解的Token
+
+LLM模型 文字接龙
+RAG模型 概括文字的含义 contrastive learning 对比学习
+
+
+Kimi agent swarm 
+Agent teams
+
+前馈神经网络 Dense
+Attention 
+Mixture of Experts 混合专家 MOE 
+Router 线性层
+
+模型选择：
+对话
+Chat GPT pro 保守 安全性 专业
+Claude 文案好 交互体验好 写prompt 
+Gemini 激进 自信 顺从用户 灵感 上下文长 调用Google search
+
+vibe coding
+命令行 
+Claude code 👍
+codex cli 文案能力差 5.3 编程能力强 可以用来review code
+配合编程
+
+特殊能力：
+Gemini 画图能力强
+Claude 工作生产力
+ChatGPT 科学推理
+
+prompt
+一、提示清晰：
+1.定义AI角色和功能
+2.告诉AI自己的提问是用特殊符号“分隔”
+
+结构化输出
+信息自动分类
+
+要求检查结果
+给出结果模版
+
+二、给模型更多思考时间-拆分更多子步骤 循序渐进
+
+
+
