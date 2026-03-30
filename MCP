@@ -1,0 +1,120 @@
+MCP（Model Context Protocol）
+MCP（Model Context Protocol）是一种让大模型“标准化地调用外部工具/数据源”的协议。 你可以把它理解成：给 AI 规定一套统一的“插座/接口”，让它能安全、可控地接入各种能力，比如：
+* 读写文件、搜索代码
+* 查数据库、调用内部 API
+* 运行命令、查日志/监控
+* 操作 Jira/GitHub 等工具
+这样，不同的 AI 客户端（IDE、聊天机器人、Agent）可以用同一套方式连接不同的“工具服务器”，不用每家都各写一套私有集成。
+没有 MCP：每个 AI 工具都要为每个系统单独做集成，混乱且难维护。
+有 MCP：工具提供方按 MCP 规范暴露能力；AI 客户端按 MCP 规范调用，实现“即插即用”。
+你可以把 MCP 类比成什么？
+* 类比 1：USB-C
+    * MCP 像 USB-C 标准：统一接口
+    * 工具（日志、DB、文件）像外设：统一接入
+    * AI 客户端像电脑：插上就能用
+* 类比 2：OpenAPI + Function Calling 的标准化组合
+    * 但 MCP 更聚焦于“给 AI 用的工具生态”，强调工具清单、参数 schema、上下文与安全边界等标准做法。
+
+
+MCP（Model Context Protocol）是一个开放协议，让 AI 模型能够连接外部工具和数据源。
+核心思想：给 AI 装"插头"
+想象你的 AI 助手是一台电脑，但它被关在一个封闭的房间里——只能用自己脑袋里的知识。MCP 就是给这个房间开了一排"插座"，让 AI 可以插上各种工具，去真实世界做事。
+
+
+一个简单例子
+你问 AI："帮我查一下我今天有什么日历安排。"
+没有 MCP：
+AI："抱歉，我无法访问你的日历。"
+有了 MCP：
+1. AI 收到你的问题
+2. 通过 MCP 协议，调用 Google Calendar 工具
+3. 工具返回你今天的日程
+4. AI 整合信息，给你完整回答
+
+MCP 解决了什么问题？
+以前每个 AI 产品想接入工具，都要自己写一套对接代码，各家不兼容。MCP 提供了一个统一标准，就像 USB 接口一样——工具做一次，所有支持 MCP 的 AI 都能用。
+没有 MCP	有了 MCP
+每个 AI 单独对接每个工具	一套协议，通用连接
+开发成本高，重复造轮子	工具生态共享
+难以扩展	插件式接入
+
+常见的 MCP 工具举例
+* 📧 Gmail — 读取/发送邮件
+* 📅 Google Calendar — 查看/创建日程
+* 📁 Google Drive — 读写文件
+* 🔍 Web Search — 搜索实时信息
+* 🗂️ Asana / Jira — 管理任务
+
+MCP 对谁有价值？
+* 开发者：降低构建 AI 应用或集成工具的开发时间和复杂度
+* AI 应用/Agent：获得丰富的数据源和工具生态，提升能力和用户体验
+* 终端用户：使用更强大的 AI，能访问你的数据并代你执行操作
+
+一、三个参与者（Participants）
+MCP 采用客户端-服务器架构，三个关键角色是：MCP Host（承载 AI 的应用，如 Claude Desktop）、MCP Client（Host 内部创建的连接组件，每个 Server 对应一个 Client）、MCP Server（提供上下文数据的程序）。
+
+二、两层架构（Layers）
+MCP 由两层组成——数据层（内层）定义基于 JSON-RPC 的通信协议，包括生命周期管理和核心原语；传输层（外层）定义通信机制，处理连接建立、消息封装和授权。
+传输层支持两种方式： Stdio 传输用于本地进程间通信，性能最优，无网络开销；Streamable HTTP 传输使用 HTTP POST，支持远程服务器通信，推荐使用 OAuth 进行认证。
+
+三、核心原语（Primitives）—— 最重要的概念
+这是开发者最需要关注的部分。Server 端可以暴露三种原语： Tools（工具）是 AI 可调用的可执行函数，如文件操作、API 调用；Resources（资源）是提供上下文信息的数据源，如文件内容、数据库记录；Prompts（提示词）是结构化交互的可复用模板。
+
+MCP 的完整通信流程：
+① 初始化握手
+② 工具发现
+③ 工具执行
+④ 实时通知
+
+LLM 本身并不"直接调用"工具，而是通过一套声明→决策→执行→反馈的循环来使用工具。
+
+四个阶段详解
+① 声明阶段：LLM 先"看菜单"
+在对话开始前，Host 会通过 MCP Client 向所有已连接的 Server 发送 tools/list 请求，把所有可用工具的名称、描述和参数 Schema 拼成一份"工具清单"，注入到 LLM 的系统提示词里。LLM 从此知道自己"会什么"。
+② 决策阶段：LLM 自己判断要不要用工具
+用户发来一条消息，LLM 读到后自行判断：这个问题需不需要调用工具？如果需要，它不会直接输出文字回答，而是输出一段结构化的 tool_use 意图块。
+这一步完全是 LLM 的"脑内决策"，还没有任何外部调用发生。
+③ 执行阶段：Host 拦截并路由
+Host 检测到 LLM 输出了 tool_use，立刻拦截，不让它直接到用户界面。Host 查找工具注册表，找到对应的 MCP Client，再由 Client 向 MCP Server 发出真正的 tools/call 请求。Server 执行真实操作（查 API、读数据库、访问文件系统等），把结果返回。
+④ 反馈阶段：结果塞回对话，LLM 再推理
+Host 把工具返回的结果作为 tool_result 消息追加到对话历史里，然后把整段历史再次送给 LLM。LLM 这次读到了工具的真实数据，才生成最终的自然语言回答给用户。
+
+Server 通过三个基础模块提供功能，它们的控制权归属各不相同： 
+功能	本质	控制方
+Tools	LLM 主动调用的函数，执行写操作等	模型决定何时调用
+Resources	只读数据源，提供背景上下文	应用程序决定如何使用
+Prompts	预制指令模板，引导整个工作流	用户显式触发
+
+一、Tools — 让 AI 能"做事"
+Tools 让 AI 能够执行操作，每个 Tool 定义了一个具体操作，有类型化的输入和输出，模型根据上下文主动决定调用时机。MCP 使用 JSON Schema 进行参数校验，每个 Tool 执行单一职责的操作，部分工具可能需要用户授权才能执行。 
+协议层面只有两个核心方法：tools/list（发现工具）和 tools/call（执行工具）。
+二、Resources — 给 AI 喂"背景信息"
+Resources 将文件、API、数据库等任何 AI 需要理解上下文的信息暴露出来，是只读的。每个 Resource 有唯一的 URI（如 file:///path/to/document.md）并声明 MIME 类型。 
+Resources 支持两种发现模式：
+直接资源是固定 URI，指向具体数据。
+资源模板还支持参数补全。
+三、Prompts — 标准化工作流
+Prompts 是结构化模板，由用户显式触发（而非自动激活）。它们可以感知上下文，引用已有的 Resources 和 Tools 来构成完整工作流。
+
+三者的本质区别一句话记住：Prompts 定义做什么（What）→ Resources 提供知道什么（Know）→ Tools 执行改变什么（Do）。
+
+
+MCP Client 由 Host 应用实例化，用于和特定 Server 通信。Host 是用户直接交互的应用（如 Claude.ai 或 IDE），Client 是协议层面负责连接的组件，每个 Client 只对应一个 Server。
+功能	本质	旅行场景举例
+Elicitation	Server 向用户请求额外信息	订座时询问靠窗还是靠走道
+Roots	Client 告诉 Server 能访问哪些目录	给 Server 指定日历文件所在文件夹
+Sampling	Server 借用 Client 的 LLM 做分析	让 LLM 从 47 个航班中挑最优解
+一、Elicitation — Server 主动向用户"要信息"
+二、Roots — Client 划定文件系统"操作范围"
+有一点需要特别注意：Roots 是协调机制，而非安全边界。规范要求 Server "应当（SHOULD）遵守"根目录边界，而非"必须（MUST）强制执行"，因为 Client 无法控制 Server 运行的代码。真正的安全必须在操作系统层面通过文件权限和沙箱来保证。
+oots 更适合的场景是防止意外操作和管理工作流范围，而不是阻止恶意行为。
+三、Sampling — Server 借用 Client 的 LLM
+
+三者的方向都是 Server → Client，但落点各不同：Elicitation 最终到达用户（要人做决定），Roots 划定文件系统范围（告诉 Server 能看哪里），Sampling 借用 LLM（让 AI 帮 Server 做分析）。
+Client 在整个 MCP 体系里扮演的是"安全中间人"的角色——所有从 Server 发出的请求，都必须经过 Client 这一层，由用户或应用决定是否放行。
+
+常见的MCP Host：
+Claude Desktop
+Cursor
+Cline
+Cherry Studio
